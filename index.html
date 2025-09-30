@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diệt Quỷ - Phá Gạch</title>
+    <!-- Tải Tailwind CSS để giao diện thân thiện, hiện đại -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cấu hình Font Inter -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b152e; /* Nền tối Demon Slayer */
+        }
+        .game-container {
+            width: 100%;
+            max-width: 600px; /* Kích thước tối đa cho trải nghiệm tốt */
+            margin: auto;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #gameCanvas {
+            /* Dùng ảnh đã tải lên (23027.jpg) làm nền kịch tính */
+            background-image: url('23027.jpg');
+            background-size: cover; /* Đảm bảo ảnh phủ kín canvas */
+            background-position: center; /* Căn giữa ảnh */
+            background-color: #050d24; /* Fallback và lớp nền tối */
+            
+            display: block;
+            width: 100%;
+            height: 400px;
+            cursor: none; /* Ẩn con trỏ chuột trong game */
+            border-bottom-left-radius: 1rem;
+            border-bottom-right-radius: 1rem;
+        }
+        /* Custom Demon Slayer (Akaza Theme) style */
+        .ds-button {
+            background-color: #f06292; /* Hot Pink/Magenta - Màu Akaza */
+            color: white;
+            transition: transform 0.1s;
+        }
+        .ds-button:hover {
+            background-color: #f48fb1;
+            transform: translateY(-2px);
+        }
+        .ds-button:active {
+            transform: translateY(0);
+        }
+        /* Giữ màu gạch cũ để phân biệt độ khó */
+        .block-type-1 { background-color: #e53e3e; } /* Đỏ - Dễ */
+        .block-type-2 { background-color: #3182ce; } /* Xanh dương - Trung bình */
+        .block-type-3 { background-color: #ecc94b; } /* Vàng - Khó */
+    </style>
+</head>
+<body class="p-4 sm:p-6 min-h-screen flex items-start justify-center">
+
+    <div class="game-container mt-8 bg-gray-800 text-white">
+
+        <!-- Header và Thông tin người dùng/Đăng nhập (Dùng màu Pink Akaza) -->
+        <header class="w-full p-4 bg-gray-900 flex justify-between items-center rounded-t-xl">
+            <h1 class="text-2xl font-bold text-pink-400">⚔️ Diệt Quỷ - Phá Gạch</h1>
+            <div id="auth-info" class="text-right text-sm">
+                <!-- Nội dung Auth được render bởi JS -->
+                <!-- Nút Đăng nhập Google được đặt ở đây và kiểm soát bằng JS -->
+            </div>
+            <!-- Nút Đăng nhập Google ban đầu được ẩn, sẽ hiện khi người dùng chưa đăng nhập -->
+            <button id="google-login-btn" class="ds-button px-4 py-2 rounded-lg font-semibold shadow-lg hidden">
+                Đăng nhập Google
+            </button>
+        </header>
+
+        <!-- Thẻ điểm số và Bảng xếp hạng -->
+        <div class="w-full p-4 bg-gray-700 grid grid-cols-2 gap-4">
+            <div class="rounded-lg p-3 bg-gray-600 shadow-inner">
+                <p class="text-xs text-gray-300">ĐIỂM CÁ NHÂN (Score)</p>
+                <p id="current-score-display" class="text-3xl font-extrabold text-yellow-300">0</p>
+            </div>
+            <div class="rounded-lg p-3 bg-gray-600 shadow-inner">
+                <p class="text-xs text-gray-300">ĐIỂM CAO NHẤT (High Score)</p>
+                <p id="high-score-display" class="text-3xl font-extrabold text-orange-500">0</p> <!-- Màu cam rực lửa -->
+            </div>
+        </div>
+
+        <!-- Canvas chứa Game -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Trạng thái Game Overlay (Game Over/Start) -->
+        <div id="game-overlay" class="absolute inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center transition-opacity duration-300" style="display:none;">
+            <h2 id="overlay-title" class="text-5xl font-extrabold text-pink-400 mb-4">SẴN SÀNG CHIẾN ĐẤU</h2>
+            <p id="overlay-message" class="text-xl text-gray-200 mb-8">Sử dụng chuột để di chuyển Lưỡi Gươm (Paddle)</p>
+            <button id="start-game-btn" class="ds-button text-xl px-8 py-3 rounded-full font-extrabold shadow-2xl">
+                BẮT ĐẦU CHƠI
+            </button>
+        </div>
+        
+        <!-- Bảng xếp hạng (Leaderboard) -->
+        <button id="toggle-leaderboard-btn" class="ds-button text-sm px-3 py-1 mt-2 mb-4 rounded-lg font-semibold shadow-md">
+            Xem Bảng Xếp Hạng
+        </button>
+
+        <div id="leaderboard" class="w-full p-4 bg-gray-700 hidden rounded-b-xl">
+            <h3 class="text-xl font-bold mb-3 text-center text-pink-400">Bảng Xếp Hạng (Top 10)</h3>
+            <ul id="leaderboard-list" class="space-y-2">
+                <!-- Dữ liệu sẽ được điền vào đây -->
+            </ul>
+        </div>
+        
+        <!-- Modal thông báo -->
+        <div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-gray-800 p-6 rounded-xl shadow-2xl max-w-sm w-full border-t-4 border-red-500">
+                <h4 class="text-xl font-bold mb-3 text-red-400">Thông Báo</h4>
+                <p id="modal-message" class="text-gray-200 mb-4"></p>
+                <button onclick="document.getElementById('modal').style.display='none';" class="ds-button px-4 py-2 w-full rounded-lg">
+                    Đóng
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Tải Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, orderBy, limit, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
+        // Thiết lập Firebase cho phép Gỡ lỗi (Debug)
+        setLogLevel('Debug');
+
+        // --- KHỞI TẠO FIREBASE & XÁC THỰC ---
+
+        // Biến toàn cục từ môi trường Canvas
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth;
+        let userId = null;
+        let userName = "Vô danh";
+        let isAuthReady = false;
+        let personalHighScore = 0;
+        let globalHighScores = [];
+
+        // Tham chiếu Firestore Collections
+        const FIREBASE_COLLECTION = "demon_slayer_block_blast_scores";
+
+        // DOM Elements
+        const authInfoEl = document.getElementById('auth-info');
+        const googleLoginBtn = document.getElementById('google-login-btn');
+        const currentScoreDisplayEl = document.getElementById('current-score-display');
+        const highScoreDisplayEl = document.getElementById('high-score-display');
+        const leaderboardListEl = document.getElementById('leaderboard-list');
+
+        // Hàm hiển thị modal thông báo
+        function showModal(message) {
+            document.getElementById('modal-message').innerHTML = message.replace(/\n/g, '<br>');
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        // Khởi tạo Firebase
+        if (firebaseConfig) {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            
+            // Xử lý trạng thái xác thực ban đầu
+            onAuthStateChanged(auth, async (user) => {
+                if (!isAuthReady) {
+                    // Đăng nhập ban đầu (Custom Token hoặc Ẩn danh)
+                    try {
+                        if (initialAuthToken) {
+                            await signInWithCustomToken(auth, initialAuthToken);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    } catch (error) {
+                        console.error("Lỗi đăng nhập Firebase ban đầu:", error);
+                        showModal("Đã xảy ra lỗi khi đăng nhập Firebase ban đầu.");
+                    }
+                    isAuthReady = true;
+                }
+
+                if (user) {
+                    userId = user.uid;
+                    userName = user.displayName || "Người chơi " + userId.substring(0, 8);
+                    
+                    // Hiển thị thông tin người dùng VÀ nút Đăng xuất
+                    authInfoEl.innerHTML = `
+                        <p class="text-pink-400 font-semibold">${userName}</p>
+                        <p class="text-xs text-gray-400">ID: ${userId}</p>
+                        <button id="logout-btn" class="ds-button text-xs px-2 py-1 mt-1 rounded-md">
+                            Đăng xuất
+                        </button>
+                    `;
+                    googleLoginBtn.style.display = 'none';
+
+                    // Thêm listener cho nút Đăng xuất
+                    document.getElementById('logout-btn').addEventListener('click', async () => {
+                        try {
+                            await signOut(auth);
+                            showModal("Bạn đã đăng xuất thành công.");
+                        } catch (error) {
+                            console.error("Lỗi đăng xuất:", error);
+                            showModal("Lỗi khi đăng xuất.");
+                        }
+                    });
+
+                    // Bắt đầu lắng nghe điểm số và bảng xếp hạng
+                    if (db) {
+                        listenForScores(userId);
+                        listenForLeaderboard();
+                    }
+
+                } else {
+                    // Người dùng chưa đăng nhập (hoặc đang ẩn danh)
+                    userId = crypto.randomUUID();
+                    userName = "Vô danh";
+                    authInfoEl.innerHTML = `<p class="text-gray-400">Bạn đang chơi ẩn danh.</p>`;
+                    googleLoginBtn.style.display = 'block'; // Hiển thị nút Đăng nhập Google
+
+                    // Reset điểm và bảng xếp hạng
+                    personalHighScore = 0;
+                    highScoreDisplayEl.textContent = '0';
+                    renderLeaderboard([]);
+                }
+            });
+            
+            // Xử lý đăng nhập Google
+            googleLoginBtn.addEventListener('click', async () => {
+                const provider = new GoogleAuthProvider();
+                try {
+                    await signInWithPopup(auth, provider);
+                } catch (error) {
+                    console.error("Lỗi đăng nhập Google:", error);
+                    showModal("Đăng nhập Google thất bại. Vui lòng thử lại.");
+                }
+            });
+
+        } else {
+            // Thay đổi thông báo để làm rõ game vẫn chơi được
+            showModal("Lỗi: Không tìm thấy cấu hình Firebase.\n\nTính năng Đăng nhập và lưu Điểm Cao (Leaderboard) sẽ bị vô hiệu hóa.\n\nBạn vẫn có thể chơi game bình thường!");
+            // Đảm bảo nút Đăng nhập Google bị ẩn khi không có Firebase
+            googleLoginBtn.style.display = 'none'; 
+        }
+
+        // Đường dẫn tới tài liệu điểm số công khai
+        function getScoreDocRef(uid) {
+            // Chỉ gọi khi db đã được khởi tạo
+            if (db) {
+                return doc(db, `artifacts/${appId}/public/data/${FIREBASE_COLLECTION}`, uid);
+            }
+            return null;
+        }
+
+        // Lắng nghe điểm cao cá nhân
+        function listenForScores(uid) {
+            const docRef = getScoreDocRef(uid);
+            if (!docRef) return;
+            onSnapshot(docRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    personalHighScore = data.highScore || 0;
+                } else {
+                    personalHighScore = 0;
+                }
+                highScoreDisplayEl.textContent = personalHighScore.toLocaleString('vi-VN');
+            }, (error) => {
+                console.error("Lỗi khi lắng nghe điểm số cá nhân:", error);
+            });
+        }
+
+        // Lắng nghe bảng xếp hạng
+        function listenForLeaderboard() {
+            if (!db) return;
+            const collectionRef = collection(db, `artifacts/${appId}/public/data/${FIREBASE_COLLECTION}`);
+            // Sắp xếp theo điểm cao nhất giảm dần và giới hạn 10 người
+            const q = query(collectionRef, orderBy("highScore", "desc"), limit(10));
+
+            onSnapshot(q, (snapshot) => {
+                globalHighScores = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                renderLeaderboard(globalHighScores);
+            }, (error) => {
+                console.error("Lỗi khi lắng nghe bảng xếp hạng:", error);
+            });
+        }
+        
+        // Render Bảng xếp hạng
+        function renderLeaderboard(scores) {
+            leaderboardListEl.innerHTML = scores.length === 0 
+                ? '<li class="text-center text-gray-400">Chưa có điểm nào. Hãy là người đầu tiên!</li>' 
+                : scores.map((score, index) => `
+                    <li class="flex justify-between p-2 rounded-md ${index < 3 ? 'bg-yellow-800 font-bold' : 'bg-gray-600'}">
+                        <span>#${index + 1} - ${score.userName}</span>
+                        <span class="text-pink-400">${score.highScore.toLocaleString('vi-VN')}</span>
+                    </li>
+                `).join('');
+        }
+        
+        // Xử lý lưu điểm cao
+        window.saveHighScore = async (newScore) => {
+            if (!isAuthReady || !db || !userId) {
+                // Chỉ lưu khi Firebase đã sẵn sàng và có userId (kể cả ẩn danh)
+                return;
+            }
+            
+            // Không lưu nếu điểm mới không cao hơn
+            if (newScore <= personalHighScore) {
+                console.log("Điểm mới không cao hơn điểm cũ, không lưu.");
+                return;
+            }
+
+            const docRef = getScoreDocRef(userId);
+
+            try {
+                // Sử dụng transaction để đảm bảo tính toàn vẹn (atomic update)
+                await runTransaction(db, async (transaction) => {
+                    const docSnapshot = await transaction.get(docRef);
+
+                    let currentHigh = 0;
+                    if (docSnapshot.exists()) {
+                        currentHigh = docSnapshot.data().highScore || 0;
+                    }
+
+                    // Chỉ cập nhật nếu điểm mới cao hơn điểm hiện tại trong database
+                    if (newScore > currentHigh) {
+                        transaction.set(docRef, {
+                            userId: userId,
+                            userName: auth.currentUser?.displayName || userName, // Cập nhật tên nếu có
+                            highScore: newScore,
+                            updatedAt: Date.now()
+                        });
+                        console.log(`Lưu điểm cao mới: ${newScore}`);
+                        showModal(`Chúc mừng! Bạn đã lập kỷ lục mới: ${newScore.toLocaleString('vi-VN')} điểm!`);
+                    }
+                });
+            } catch (e) {
+                console.error("Lỗi khi cập nhật điểm cao:", e);
+                showModal("Lỗi khi lưu điểm cao. Vui lòng kiểm tra console.");
+            }
+        };
+
+        // --- LOGIC GAME PHÁ GẠCH ---
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const overlay = document.getElementById('game-overlay');
+        const overlayTitle = document.getElementById('overlay-title');
+        const overlayMessage = document.getElementById('overlay-message');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const toggleLeaderboardBtn = document.getElementById('toggle-leaderboard-btn');
+        const leaderboardEl = document.getElementById('leaderboard');
+        
+        let animationFrameId;
+        let isGameRunning = false;
+        let score = 0;
+        
+        // Cài đặt Game
+        const PADDLE_HEIGHT = 10;
+        const PADDLE_WIDTH = 75;
+        let paddleX; // Vị trí X của paddle
+        let paddleY; // Vị trí Y của paddle (cố định)
+
+        const BALL_RADIUS = 5;
+        let ballX, ballY, ballDX, ballDY;
+        
+        // Cài đặt Gạch (Blocks - Quỷ)
+        const BLOCK_ROW_COUNT = 5;
+        const BLOCK_COLUMN_COUNT = 8;
+        const BLOCK_WIDTH = 60;
+        const BLOCK_HEIGHT = 15;
+        const BLOCK_PADDING = 5;
+        const BLOCK_OFFSET_TOP = 30;
+        const BLOCK_OFFSET_LEFT = 30;
+        let blocks = []; // Mảng chứa trạng thái gạch
+
+        // Mouse/Touch controls
+        let relativeX = 0; // Vị trí chuột so với canvas
+        
+        // Cài đặt kích thước Canvas ban đầu
+        function setupCanvasSize() {
+            // Đảm bảo canvas luôn full width của container (max-width 600px)
+            const containerWidth = canvas.parentElement.clientWidth;
+            canvas.width = containerWidth;
+            canvas.height = 400; // Chiều cao cố định
+            
+            paddleY = canvas.height - PADDLE_HEIGHT - 10;
+        }
+
+        // Khởi tạo trạng thái game (Bricks, Ball, Paddle)
+        function initializeGame() {
+            setupCanvasSize();
+            score = 0;
+            currentScoreDisplayEl.textContent = '0';
+            paddleX = (canvas.width - PADDLE_WIDTH) / 2;
+
+            // Thiết lập vị trí và vận tốc bóng
+            ballX = canvas.width / 2;
+            ballY = paddleY - BALL_RADIUS;
+            ballDX = 2 + Math.random() * 2 * (Math.random() < 0.5 ? 1 : -1); // Tốc độ ngẫu nhiên
+            ballDY = -2 - Math.random() * 2; // Luôn đi lên
+
+            // Tạo các khối gạch
+            blocks = [];
+            for (let c = 0; c < BLOCK_COLUMN_COUNT; c++) {
+                blocks[c] = [];
+                for (let r = 0; r < BLOCK_ROW_COUNT; r++) {
+                    const type = Math.floor(Math.random() * 3) + 1; // 1, 2, or 3 for different colors
+                    blocks[c][r] = { x: 0, y: 0, status: 1, type: type }; // status 1: còn
+                }
+            }
+            
+            // Ẩn overlay và bắt đầu vòng lặp game
+            overlay.style.display = 'none';
+            isGameRunning = true;
+            startGameLoop();
+        }
+        
+        // Xử lý sự kiện di chuyển chuột/chạm
+        canvas.addEventListener('mousemove', handleMouseMove, false);
+        canvas.addEventListener('touchmove', handleTouchMove, false);
+
+        function handleMouseMove(e) {
+            relativeX = e.clientX - canvas.getBoundingClientRect().left;
+            movePaddle();
+        }
+        
+        function handleTouchMove(e) {
+            e.preventDefault(); // Ngăn cuộn trang trên mobile
+            if (e.touches.length > 0) {
+                relativeX = e.touches[0].clientX - canvas.getBoundingClientRect().left;
+                movePaddle();
+            }
+        }
+        
+        function movePaddle() {
+            if (isGameRunning) {
+                paddleX = relativeX - PADDLE_WIDTH / 2;
+                // Giới hạn Paddle không vượt ra ngoài Canvas
+                if (paddleX < 0) {
+                    paddleX = 0;
+                } else if (paddleX + PADDLE_WIDTH > canvas.width) {
+                    paddleX = canvas.width - PADDLE_WIDTH;
+                }
+            }
+        }
+
+        // --- VẼ CÁC THÀNH PHẦN ---
+        
+        // Vẽ Lưỡi Gươm (Paddle) - Viền Hồng Akaza
+        function drawPaddle() {
+            ctx.beginPath();
+            // Hình dạng lưỡi gươm đơn giản, dùng màu đen và viền Pink Akaza
+            ctx.rect(paddleX, paddleY, PADDLE_WIDTH, PADDLE_HEIGHT);
+            ctx.fillStyle = "#1f2937"; // Màu than chì
+            ctx.strokeStyle = "#f06292"; // Pink Akaza
+            ctx.lineWidth = 2;
+            ctx.fill();
+            ctx.stroke();
+            ctx.closePath();
+        }
+        
+        // Vẽ Hơi Thở (Ball) - Màu Cam Rực Lửa
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, BALL_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = "#ff9800"; // Orange Rực Lửa
+            ctx.shadowColor = "#ff9800";
+            ctx.shadowBlur = 5;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.closePath();
+        }
+
+        // Vẽ Khối Quỷ (Bricks)
+        function drawBlocks() {
+            for (let c = 0; c < BLOCK_COLUMN_COUNT; c++) {
+                for (let r = 0; r < BLOCK_ROW_COUNT; r++) {
+                    const block = blocks[c][r];
+                    if (block.status === 1) {
+                        // Tính toán vị trí gạch
+                        const blockX = (c * (BLOCK_WIDTH + BLOCK_PADDING)) + BLOCK_OFFSET_LEFT;
+                        const blockY = (r * (BLOCK_HEIGHT + BLOCK_PADDING)) + BLOCK_OFFSET_TOP;
+                        block.x = blockX;
+                        block.y = blockY;
+
+                        ctx.beginPath();
+                        ctx.rect(blockX, blockY, BLOCK_WIDTH, BLOCK_HEIGHT);
+
+                        // Màu dựa trên loại (Demon Slayer Theme Colors)
+                        let color;
+                        switch (block.type) {
+                            case 1: color = "#e53e3e"; break; // Đỏ: Dễ
+                            case 2: color = "#3182ce"; break; // Xanh dương: Trung bình
+                            case 3: color = "#ecc94b"; break; // Vàng: Khó
+                        }
+                        ctx.fillStyle = color;
+                        ctx.fill();
+                        
+                        ctx.strokeStyle = "#050d24"; // Viền tối
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+        
+        // VẼ ĐIỂM
+        function drawScore() {
+            // Cập nhật điểm trên thẻ HTML thay vì vẽ lên Canvas
+            currentScoreDisplayEl.textContent = score.toLocaleString('vi-VN');
+        }
+
+        // --- LOGIC GAME ---
+
+        // Xử lý va chạm bóng với gạch
+        function collisionDetection() {
+            for (let c = 0; c < BLOCK_COLUMN_COUNT; c++) {
+                for (let r = 0; r < BLOCK_ROW_COUNT; r++) {
+                    const block = blocks[c][r];
+                    if (block.status === 1) {
+                        const blockX = block.x;
+                        const blockY = block.y;
+                        
+                        // Kiểm tra va chạm với gạch
+                        if (ballX > blockX - BALL_RADIUS && ballX < blockX + BLOCK_WIDTH + BALL_RADIUS && 
+                            ballY > blockY - BALL_RADIUS && ballY < blockY + BLOCK_HEIGHT + BALL_RADIUS) {
+                            
+                            // Đổi hướng bóng
+                            ballDY = -ballDY;
+                            
+                            // Đánh dấu gạch đã bị phá
+                            block.status = 0;
+                            
+                            // Tăng điểm dựa trên loại gạch
+                            score += block.type * 10;
+                            
+                            // Kiểm tra xem đã phá hết gạch chưa
+                            checkWinCondition();
+                            return; // Chỉ xử lý va chạm với 1 gạch mỗi frame
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Xử lý va chạm bóng với Lưỡi Gươm (Paddle)
+        function paddleCollision() {
+            if (ballY + BALL_RADIUS > paddleY && 
+                ballX > paddleX && ballX < paddleX + PADDLE_WIDTH &&
+                ballY + BALL_RADIUS < paddleY + PADDLE_HEIGHT) { // Va chạm từ trên xuống
+                
+                ballDY = -ballDY; // Đảo chiều Y
+                
+                // Điều chỉnh góc bật lại dựa trên vị trí va chạm trên paddle (tạo hiệu ứng xoáy)
+                const relativeImpactX = ballX - (paddleX + PADDLE_WIDTH / 2); // Khoảng cách từ tâm paddle
+                ballDX = relativeImpactX * 0.2; // Độ mạnh của xoáy (0.2 là hệ số)
+            }
+        }
+        
+        // Kiểm tra điều kiện thắng
+        function checkWinCondition() {
+            let allBricksGone = true;
+            for (let c = 0; c < BLOCK_COLUMN_COUNT; c++) {
+                for (let r = 0; r < BLOCK_ROW_COUNT; r++) {
+                    if (blocks[c][r].status === 1) {
+                        allBricksGone = false;
+                        break;
+                    }
+                }
+                if (!allBricksGone) break;
+            }
+
+            if (allBricksGone) {
+                gameOver(true);
+            }
+        }
+
+        // Vòng lặp Game
+        function gameLoop() {
+            if (!isGameRunning) {
+                cancelAnimationFrame(animationFrameId);
+                return;
+            }
+
+            // Xóa Canvas (Quan trọng để các đối tượng được vẽ lại)
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Cập nhật vị trí bóng
+            ballX += ballDX;
+            ballY += ballDY;
+
+            // Xử lý va chạm tường (Trái/Phải)
+            if (ballX + ballDX > canvas.width - BALL_RADIUS || ballX + ballDX < BALL_RADIUS) {
+                ballDX = -ballDX;
+            }
+
+            // Xử lý va chạm tường (Trên)
+            if (ballY + ballDY < BALL_RADIUS) {
+                ballDY = -ballDY;
+            } 
+            
+            // Xử lý game over (Dưới)
+            else if (ballY + ballDY > canvas.height - BALL_RADIUS) {
+                gameOver(false);
+                return;
+            }
+
+            // Va chạm với Lưỡi Gươm
+            paddleCollision();
+
+            // Va chạm với Khối Quỷ
+            collisionDetection();
+            
+            // VẼ
+            drawBlocks();
+            drawPaddle();
+            drawBall();
+            drawScore();
+
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Bắt đầu vòng lặp game
+        function startGameLoop() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        // Xử lý Game Over
+        function gameOver(isWin) {
+            isGameRunning = false;
+            cancelAnimationFrame(animationFrameId);
+            
+            // Hiển thị overlay
+            overlay.style.display = 'flex';
+            startGameBtn.textContent = 'CHƠI LẠI';
+
+            if (isWin) {
+                overlayTitle.textContent = "CHIẾN THẮNG TRỌN VẸN!";
+                overlayMessage.textContent = `Bạn đã đạt ${score.toLocaleString('vi-VN')} điểm!`;
+            } else {
+                overlayTitle.textContent = "TRÒ CHƠI KẾT THÚC";
+                overlayMessage.textContent = `Điểm cuối cùng của bạn: ${score.toLocaleString('vi-VN')} điểm.`;
+            }
+            
+            // Lưu điểm cao
+            if (score > 0) {
+                window.saveHighScore(score);
+            }
+        }
+
+        // Xử lý sự kiện Bắt đầu/Chơi lại
+        startGameBtn.addEventListener('click', initializeGame);
+        
+        // Xử lý Toggle Leaderboard
+        toggleLeaderboardBtn.addEventListener('click', () => {
+            const isHidden = leaderboardEl.classList.contains('hidden');
+            if (isHidden) {
+                leaderboardEl.classList.remove('hidden');
+                toggleLeaderboardBtn.textContent = 'Ẩn Bảng Xếp Hạng';
+            } else {
+                leaderboardEl.classList.add('hidden');
+                toggleLeaderboardBtn.textContent = 'Xem Bảng Xếp Hạng';
+            }
+        });
+
+        // Setup ban đầu
+        window.addEventListener('load', () => {
+            setupCanvasSize();
+            // Thiết lập vị trí overlay ban đầu
+            const rect = canvas.getBoundingClientRect();
+            overlay.style.top = `${rect.top}px`;
+            overlay.style.left = `${rect.left}px`;
+            overlay.style.width = `${rect.width}px`;
+            overlay.style.height = `${rect.height}px`;
+            
+            overlay.style.display = 'flex'; // Hiện overlay chờ người chơi
+            overlayTitle.textContent = "SẴN SÀNG CHIẾN ĐẤU";
+            overlayMessage.textContent = `Sử dụng chuột để di chuyển Lưỡi Gươm (Paddle).`;
+        });
+
+        // Xử lý khi resize cửa sổ
+        window.addEventListener('resize', () => {
+            setupCanvasSize();
+            // Cập nhật vị trí overlay khi resize
+            const rect = canvas.getBoundingClientRect();
+            overlay.style.top = `${rect.top}px`;
+            overlay.style.left = `${rect.left}px`;
+            overlay.style.width = `${rect.width}px`;
+            overlay.style.height = `${rect.height}px`;
+        });
+    </script>
+</body>
+</html>

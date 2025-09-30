@@ -135,10 +135,43 @@
 
         // --- KHỞI TẠO FIREBASE & XÁC THỰC ---
 
-        // Biến toàn cục từ môi trường Canvas
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // ====================================================================
+        // HƯỚNG DẪN: NẾU BẠN TỰ XUẤT CODE RA WEB BẰNG GITHUB/NETLIFY,
+        // HÃY TẠO DỰ ÁN FIREBASE RIÊNG VÀ THAY THẾ KHỐI CODE BÊN DƯỚI BẰNG 
+        // CẤU HÌNH CỦA BẠN (ĐỂ KHÔNG CẦN DÙNG CÁC BIẾN TOÀN CỤC CỦA CANVAS NỮA)
+        // ====================================================================
+        
+        // Cấu hình mặc định (dùng khi không tìm thấy cấu hình Canvas)
+        let firebaseConfig = null;
+        let initialAuthToken = null;
+        let appId = 'default-app-id';
+
+        // Lấy các biến từ môi trường Canvas (Ưu tiên)
+        if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+            firebaseConfig = JSON.parse(__firebase_config);
+        }
+        if (typeof __initial_auth_token !== 'undefined') {
+            initialAuthToken = __initial_auth_token;
+        }
+        if (typeof __app_id !== 'undefined') {
+            appId = __app_id;
+        }
+        
+        // Ví dụ cấu hình CỨNG (chỉ dùng nếu bạn tự host)
+        /*
+        firebaseConfig = {
+            apiKey: "AIzaSy...",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project",
+            storageBucket: "...",
+            messagingSenderId: "...",
+            appId: "1:..."
+        };
+        initialAuthToken = null;
+        appId = "your-project";
+        */
+        
+        // ====================================================================
 
         let app, db, auth;
         let userId = null;

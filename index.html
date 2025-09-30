@@ -157,7 +157,8 @@
             appId = __app_id;
         }
         
-        // Ví dụ cấu hình CỨNG (chỉ dùng nếu bạn tự host)
+        // ====================================================================
+        // *** DÁN CẤU HÌNH CỦA BẠN VÀO ĐÂY (BỎ DẤU /* */ VÀ THAY THẾ THÔNG TIN) ***
         /*
         firebaseConfig = {
             apiKey: "AIzaSy...",
@@ -165,12 +166,11 @@
             projectId: "your-project",
             storageBucket: "...",
             messagingSenderId: "...",
-            appId: "1:..."
+            appId: "1:..." // App ID của ứng dụng Web
         };
-        initialAuthToken = null;
-        appId = "your-project";
+        initialAuthToken = null; // Luôn là null nếu bạn tự host
+        appId = "your-project"; // Thay bằng Project ID của bạn
         */
-        
         // ====================================================================
 
         let app, db, auth;
